@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Movimiento Parabólico — Flecha</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #ffffff;
+      color: #2C2C2A;
+      padding: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #2C2C2A;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #5F5E5A;
+      margin-bottom: 16px;
+    }
+
+    /* ── Controles de parámetros ── */
+    .params {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      font-size: 13px;
+      color: #5F5E5A;
+      background: #F1EFE8;
+      border-radius: 8px;
+      margin-bottom: 14px;
+    }
+
+    .params label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+
+    input[type="number"] {
+      padding: 5px 8px;
+      border: 0.5px solid #B4B2A9;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 13px;
+      color: #2C2C2A;
+      outline: none;
+      font-family: monospace;
+    }
+
+    input[type="number"]:focus { 
+      border-color: #1D9E75; 
+      box-shadow: 0 0 0 2px rgba(29,158,117,0.1);
+    }
+
+    button {
+      padding: 6px 14px;
+      border: 0.5px solid #B4B2A9;
+      border-radius: 6px;
+      background: transparent;
+      font-size: 13px;
+      cursor: pointer;
+      color: #2C2C2A;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+
+    button:hover { 
+      background: #E1F5EE;
+      border-color: #1D9E75;
+    }
+    button:active { transform: scale(0.96); }
+
+    #finfo {
+      font-size: 12px;
+      color: #888780;
+      flex: 1;
+      text-align: right;
+    }
+
+    /* ── Canvas ── */
+    #simc {
+      display: block;
+      width: 100%;
+      border-radius: 8px;
+      border: 0.5px solid #D3D1C7;
+      background: #f7f6f3;
+      margin-bottom: 12px;
+    }
+
+    /* ── Leyenda ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 8px 0;
+      font-size: 12px;
+      color: #5F5E5A;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .leg-line {
+      display: inline-block;
+      width: 20px;
+      height: 2.5px;
+      border-radius: 2px;
+    }
+
+    /* ── Controles de reproducción ── */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 0 12px;
+      border-bottom: 0.5px solid #D3D1C7;
+      margin-bottom: 12px;
+    }
+
+    #btnP { min-width: 95px; }
+
+    .speed-label {
+      font-size: 12px;
+      color: #5F5E5A;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+
+    input[type="range"] {
+      vertical-align: middle;
+      accent-color: #1D9E75;
+      cursor: pointer;
+    }
+
+    .tsl-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 160px;
+      font-size: 12px;
+      color: #5F5E5A;
+      font-weight: 500;
+    }
+
+    #tsl { flex: 1; }
+
+    /* ── Mini-tarjetas de métricas ── */
+    #mc {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+      gap: 8px;
+      padding: 0 0 12px;
+      margin-bottom: 12px;
+    }
+
+    .mcard {
+      background: #F1EFE8;
+      border-radius: 6px;
+      padding: 8px 10px;
+      border: 0.5px solid rgba(212,208,197,0.5);
+    }
+
+    .mcard .ml {
+      font-size: 10px;
+      color: #888780;
+      margin-bottom: 3px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
+    .mcard .mv {
+      font-size: 14px;
+      font-weight: 500;
+      font-family: monospace;
+      color: #2C2C2A;
+    }
+
+    /* ── Cajas de cálculo ── */
+    .calcs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      padding: 0;
+    }
+
+    .cbx {
+      background: #F1EFE8;
+      border-radius: 8px;
+      padding: 12px 14px;
+      border: 0.5px solid rgba(212,208,197,0.5);
+    }
+
+    .cbx .ctitle {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .cbx pre {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.7;
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      color: #5F5E5A;
+    }
+
+    /* ── Colores de vectores ── */
+    .col-pos { color: #0F6E56; }
+    .col-vel { color: #185FA5; }
+    .col-acc { color: #993C1D; }
+
+    /* ── Encabezado con info ── */
+    .info-box {
+      background: #E8F4F0;
+      border-left: 3px solid #1D9E75;
+      padding: 10px 12px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      color: #2C2C2A;
+    }
+
+    .info-box strong {
+      color: #0F6E56;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Simulador de Movimiento Parabólico</h1>
+  <p class="subtitle">Análisis dinámico del lanzamiento de una flecha: v₀ = 49 m/s, θ = 45°</p>
+
+  <div class="info-box">
+    <strong>Instrucciones:</strong> Ajusta los parámetros, presiona "Aplicar" y usa los controles para reproducir la animación. 
+    Observa en tiempo real cómo varían posición, velocidad y aceleración.
+  </div>
+
+  <!-- Parámetros modificables -->
+  <div class="params">
+    <label>v₀ (m/s): <input type="number" id="pv0" value="49" min="1" max="500" step="1"></label>
+    <label>θ (°):    <input type="number" id="pa"  value="45" min="1" max="89"  step="1"></label>
+    <label>g (m/s²): <input type="number" id="pg"  value="9.8" min="0.1" max="30" step="0.1"></label>
+    <button onclick="applyP()">✓ Aplicar</button>
+    <span id="finfo"></span>
+  </div>
+
+  <!-- Canvas principal -->
+  <canvas id="simc" height="380"></canvas>
+
+  <!-- Leyenda -->
+  <div class="legend">
+    <span><span class="leg-line" style="background:#0F6E56"></span>posición (r)</span>
+    <span><span class="leg-line" style="background:#185FA5"></span>velocidad (v)</span>
+    <span><span class="leg-line" style="background:#993C1D"></span>aceleración (a)</span>
+    <span><span class="leg-line" style="background:#888780;border-top:2px dashed #888780;height:0;background:none"></span>trayectoria</span>
+  </div>
+
+  <!-- Controles de reproducción -->
+  <div class="controls">
+    <button onclick="step(-20)" title="−20 cuadros">⏮ Inicio</button>
+    <button onclick="step(-1)"  title="−1 cuadro">◀</button>
+    <button id="btnP" onclick="togglePlay()">▶ Play</button>
+    <button onclick="step(1)"   title="+1 cuadro">▶</button>
+    <button onclick="step(20)"  title="+20 cuadros">Final ⏭</button>
+    <button onclick="resetS()">↺ Reiniciar</button>
+
+    <label class="speed-label">Velocidad:
+      <input type="range" id="spd" min="0.2" max="6" step="0.2" value="1" style="width:70px"
+        oninput="document.getElementById('sv').textContent = parseFloat(this.value).toFixed(1) + '×'">
+      <span id="sv" style="min-width:32px;display:inline-block">1.0×</span>
+    </label>
+
+    <div class="tsl-wrap">
+      t: <input type="range" id="tsl" min="0" max="300" value="0"
+           oninput="seekTo(parseInt(this.value))">
+    </div>
+  </div>
+
+  <!-- Mini-tarjetas numéricas -->
+  <div id="mc"></div>
+
+  <!-- Cálculos paso a paso -->
+  <div class="calcs">
+    <div class="cbx"><div class="ctitle col-pos">📍 Posición</div><pre id="ptb"></pre></div>
+    <div class="cbx"><div class="ctitle col-vel">→ Velocidad</div><pre id="vtb"></pre></div>
+    <div class="cbx"><div class="ctitle col-acc">⬇ Aceleración</div><pre id="atb"></pre></div>
+  </div>
+
+<script>
+/* ═══════════════════════════════════════════
+   CONFIGURACIÓN DEL CANVAS
+═══════════════════════════════════════════ */
+const cv  = document.getElementById('simc');
+const cx  = cv.getContext('2d');
+
+const CW = 760, CH = 380;
+const ML = 65, MR = 20, MT = 28, MB = 50;
+const DW = CW - ML - MR;
+const DH = CH - MT - MB;
+
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+cv.width  = CW * DPR;
+cv.height = CH * DPR;
+cx.scale(DPR, DPR);
+
+/* ═══════════════════════════════════════════
+   PARÁMETROS DE LA SIMULACIÓN
+═══════════════════════════════════════════ */
+let P    = { v0: 49, angle: 45, g: 9.8 };
+let meta = {};
+let traj = [];
+let sc   = 1;
+
+const FR = 300;
+
+/* ═══════════════════════════════════════════
+   ESTADO DE LA ANIMACIÓN
+═══════════════════════════════════════════ */
+let frame   = 0;
+let playing = false;
+let rafId   = null;
+let lastTs  = null;
+
+/* ═══════════════════════════════════════════
+   PALETA DE COLORES
+═══════════════════════════════════════════ */
+const C = {
+  bg:  '#f7f6f3',
+  gr:  '#e0ddd5',
+  ax:  '#888780',
+  lb:  '#5F5E5A',
+  gh:  '#c5c2ba',
+  dot: '#2C2C2A',
+  pos: '#0F6E56',
+  vel: '#185FA5',
+  acc: '#993C1D',
+};
+
+/* ═══════════════════════════════════════════
+   FUNCIONES DE TRANSFORMACIÓN DE COORDENADAS
+═══════════════════════════════════════════ */
+function TX(x) { return ML + x * sc; }
+function TY(y) { return CH - MB - y * sc; }
+
+/* ═══════════════════════════════════════════
+   CÁLCULO DE LA TRAYECTORIA
+═══════════════════════════════════════════ */
+function compute() {
+  const { v0, angle, g } = P;
+  const th  = angle * Math.PI / 180;
+  const v0x = v0 * Math.cos(th);
+  const v0y = v0 * Math.sin(th);
+  const T   = 2 * v0y / g;
+  const R   = v0x * T;
+  const Hmax = (v0y * v0y) / (2 * g);
+
+  meta = { T, R, Hmax, v0x, v0y };
+
+  traj = [];
+  for (let i = 0; i <= FR; i++) {
+    const t  = (i / FR) * T;
+    const x  = v0x * t;
+    const y  = v0y * t - 0.5 * g * t * t;
+    traj.push({
+      t,
+      x,
+      y,
+      vx: v0x,
+      vy: v0y - g * t,
+      ax: 0,
+      ay: -g,
+    });
+  }
+
+  const sx = DW / (R    * 1.08);
+  const sy = DH / (Hmax * 1.22);
+  sc = Math.min(sx, sy);
+}
+
+/* ═══════════════════════════════════════════
+   DIBUJAR FLECHA CON PUNTA
+═══════════════════════════════════════════ */
+function arw(x1, y1, x2, y2, col, lw) {
+  const dx  = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 2.5) return;
+
+  const HL  = Math.min(11, len * 0.45);
+  const ang = Math.atan2(dy, dx);
+  const eL  = len - HL * 0.65;
+  const ex  = x1 + (dx / len) * eL;
+  const ey  = y1 + (dy / len) * eL;
+
+  cx.save();
+  cx.strokeStyle = col;
+  cx.fillStyle   = col;
+  cx.lineWidth   = lw;
+  cx.lineCap     = 'round';
+
+  cx.beginPath(); cx.moveTo(x1, y1); cx.lineTo(ex, ey); cx.stroke();
+
+  cx.beginPath();
+  cx.moveTo(x2, y2);
+  cx.lineTo(x2 - HL * Math.cos(ang - 0.4), y2 - HL * Math.sin(ang - 0.4));
+  cx.lineTo(x2 - HL * Math.cos(ang + 0.4), y2 - HL * Math.sin(ang + 0.4));
+  cx.closePath();
+  cx.fill();
+  cx.restore();
+}
+
+/* ═══════════════════════════════════════════
+   DIBUJAR LÍNEA PUNTEADA
+═══════════════════════════════════════════ */
+function dsh(x1, y1, x2, y2, col) {
+  cx.save();
+  cx.strokeStyle   = col;
+  cx.lineWidth     = 1;
+  cx.globalAlpha   = 0.4;
+  cx.setLineDash([4, 4]);
+  cx.beginPath(); cx.moveTo(x1, y1); cx.lineTo(x2, y2); cx.stroke();
+  cx.restore();
+}
+
+/* ═══════════════════════════════════════════
+   CALCULAR PASO "BONITO" PARA LA CUADRÍCULA
+═══════════════════════════════════════════ */
+function niceStep(v) {
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / p;
+  return p * (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10);
+}
+
+/* ═══════════════════════════════════════════
+   FUNCIÓN PRINCIPAL DE DIBUJO
+═══════════════════════════════════════════ */
+function draw() {
+  cx.clearRect(0, 0, CW, CH);
+  cx.fillStyle = C.bg;
+  cx.fillRect(0, 0, CW, CH);
+
+  const { R, Hmax, v0x, v0y } = meta;
+  const stX = niceStep(R    / 6);
+  const stY = niceStep(Hmax / 4);
+
+  /* ── Cuadrícula ── */
+  cx.save();
+  cx.strokeStyle = C.gr;
+  cx.lineWidth   = 0.5;
+  for (let x = 0; x <= R * 1.1; x += stX) {
+    cx.beginPath(); cx.moveTo(TX(x), MT); cx.lineTo(TX(x), CH - MB); cx.stroke();
+  }
+  for (let y = 0; y <= Hmax * 1.3; y += stY) {
+    if (TY(y) < MT) break;
+    cx.beginPath(); cx.moveTo(ML, TY(y)); cx.lineTo(CW - MR, TY(y)); cx.stroke();
+  }
+  cx.restore();
+
+  /* ── Ejes ── */
+  cx.save();
+  cx.strokeStyle = C.ax;
+  cx.lineWidth   = 1.2;
+  cx.beginPath();
+  cx.moveTo(ML, MT); cx.lineTo(ML, CH - MB); cx.lineTo(CW - MR, CH - MB);
+  cx.stroke();
+  cx.restore();
+
+  /* ── Etiquetas de ejes ── */
+  cx.save();
+  cx.fillStyle  = C.lb;
+  cx.font       = '11px monospace';
+  cx.textAlign  = 'center';
+  for (let x = stX; x <= R * 1.08; x += stX) {
+    cx.fillText(x.toFixed(0), TX(x), CH - MB + 16);
+  }
+  cx.textAlign = 'right';
+  for (let y = stY; y <= Hmax * 1.25; y += stY) {
+    if (TY(y) < MT + 5) break;
+    cx.fillText(y.toFixed(0), ML - 6, TY(y) + 4);
+  }
+  cx.font      = '12px sans-serif';
+  cx.fillStyle = C.ax;
+  cx.textAlign = 'center';
+  cx.fillText('x (m)', ML + DW / 2, CH - 6);
+  cx.save();
+    cx.translate(14, MT + DH / 2);
+    cx.rotate(-Math.PI / 2);
+    cx.fillText('y (m)', 0, 0);
+  cx.restore();
+  cx.restore();
+
+  /* ── Trayectoria completa ── */
+  cx.save();
+  cx.strokeStyle = C.gh;
+  cx.lineWidth   = 1;
+  cx.setLineDash([3, 4]);
+  cx.beginPath();
+  for (let i = 0; i <= FR; i++) {
+    const p = traj[i];
+    i === 0 ? cx.moveTo(TX(p.x), TY(Math.max(0, p.y)))
+            : cx.lineTo(TX(p.x), TY(Math.max(0, p.y)));
+  }
+  cx.stroke();
+  cx.restore();
+
+  /* ── Líneas guía ── */
+  const tPk = v0y / P.g;
+  const xPk = v0x * tPk;
+  cx.save();
+  cx.strokeStyle = C.gh;
+  cx.lineWidth   = 0.5;
+  cx.setLineDash([2, 4]);
+  cx.beginPath(); cx.moveTo(ML, TY(Hmax)); cx.lineTo(TX(xPk), TY(Hmax)); cx.stroke();
+  cx.beginPath(); cx.moveTo(TX(R), CH - MB); cx.lineTo(TX(R), CH - MB + 6); cx.stroke();
+  cx.fillStyle  = C.lb;
+  cx.font       = '10px monospace';
+  cx.textAlign  = 'left';
+  cx.fillText('H=' + Hmax.toFixed(1) + 'm', ML + 4, TY(Hmax) - 4);
+  cx.textAlign  = 'center';
+  cx.fillText('R=' + R.toFixed(1) + 'm', TX(R), CH - MB + 28);
+  cx.restore();
+
+  /* ── Estela de puntos ── */
+  const fi = Math.min(FR, Math.floor(frame));
+  cx.save();
+  for (let i = Math.max(0, fi - 50); i < fi; i++) {
+    const alpha  = 0.05 + 0.65 * ((i - (fi - 50)) / 50);
+    const radius = 1.0  + 2.5 * ((i - (fi - 50)) / 50);
+    cx.fillStyle = `rgba(15,110,86,${alpha})`;
+    cx.beginPath();
+    cx.arc(TX(traj[i].x), TY(Math.max(0, traj[i].y)), radius, 0, Math.PI * 2);
+    cx.fill();
+  }
+  cx.restore();
+
+  /* ── Punto y vectores ── */
+  const pt = traj[fi];
+  const px = TX(pt.x);
+  const py = TY(Math.max(0, pt.y));
+  const ox = TX(0), oy = TY(0);
+
+  /* Vector POSICIÓN */
+  if (Math.hypot(px - ox, py - oy) > 4) {
+    arw(ox, oy, px, py, C.pos, 2.8);
+    cx.save();
+    cx.fillStyle = C.pos;
+    cx.font      = 'bold 13px sans-serif';
+    cx.textAlign = 'left';
+    cx.fillText('r', (ox + px) / 2 + 8, (oy + py) / 2 - 6);
+    cx.restore();
+  }
+
+  /* Vector VELOCIDAD */
+  const VS  = 85 / P.v0;
+  const vdx = pt.vx * VS;
+  const vdy = -pt.vy * VS;
+  dsh(px, py, px + vdx, py, C.vel);
+  dsh(px + vdx, py, px + vdx, py + vdy, C.vel);
+  arw(px, py, px + vdx, py + vdy, C.vel, 2.8);
+  cx.save();
+  cx.fillStyle = C.vel;
+  cx.font      = 'bold 13px sans-serif';
+  cx.textAlign = 'left';
+  cx.fillText('v', px + vdx + (vdx >= 0 ? 8 : -22), py + vdy - 6);
+  cx.restore();
+
+  /* Vector ACELERACIÓN */
+  const AS = 65 / P.g;
+  arw(px, py, px, py + P.g * AS, C.acc, 2.8);
+  cx.save();
+  cx.fillStyle = C.acc;
+  cx.font      = 'bold 13px sans-serif';
+  cx.textAlign = 'left';
+  cx.fillText('a', px + 9, py + P.g * AS * 0.5 + 5);
+  cx.restore();
+
+  /* ── Flecha en 3D ── */
+  const ma = Math.atan2(-pt.vy, pt.vx);
+  cx.save();
+  cx.translate(px, py);
+  cx.rotate(ma);
+  cx.fillStyle   = C.dot;
+  cx.strokeStyle = C.dot;
+  cx.lineWidth   = 1.8;
+  cx.lineCap     = 'round';
+  cx.fillRect(-11, -1.8, 11, 3.6);
+  cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(-6, -4.5); cx.lineTo(-6, 4.5); cx.closePath(); cx.fill();
+  cx.beginPath(); cx.moveTo(-11, 0); cx.lineTo(-18, -5); cx.stroke();
+  cx.beginPath(); cx.moveTo(-11, 0); cx.lineTo(-18,  5); cx.stroke();
+  cx.restore();
+  cx.beginPath(); cx.arc(px, py, 4, 0, Math.PI * 2);
+  cx.fillStyle = C.dot; cx.fill();
+
+  /* ── Ángulo inicial ── */
+  if (fi === 0) {
+    const th = P.angle * Math.PI / 180, ar = 35;
+    cx.save();
+    cx.strokeStyle = C.lb;
+    cx.lineWidth   = 1;
+    cx.setLineDash([2, 3]);
+    cx.beginPath(); cx.arc(ox, oy, ar, -th, 0, true); cx.stroke();
+    cx.fillStyle  = C.lb;
+    cx.font       = '11px sans-serif';
+    cx.fillText('θ=' + P.angle + '°', ox + ar * Math.cos(-th / 2) + 3, oy + ar * Math.sin(-th / 2) - 2);
+    cx.restore();
+  }
+
+  /* ── HUD ── */
+  cx.save();
+  cx.fillStyle  = C.lb;
+  cx.font       = '12px monospace';
+  cx.textAlign  = 'right';
+  cx.fillText('t = ' + pt.t.toFixed(3) + ' s', CW - MR - 6, MT + 14);
+  cx.fillText('cuadro ' + fi + '/' + FR, CW - MR - 6, MT + 28);
+  cx.restore();
+}
+
+/* ═══════════════════════════════════════════
+   ACTUALIZAR PANEL DE CÁLCULOS Y MÉTRICAS
+═══════════════════════════════════════════ */
+function f2(n) { return isNaN(n) ? '—' : n.toFixed(2); }
+function f3(n) { return isNaN(n) ? '—' : n.toFixed(3); }
+function hl(valor, color) { return `<span style="color:${color};font-weight:600">${valor}</span>`; }
+
+function updateUI() {
+  const fi = Math.min(FR, Math.floor(frame));
+  const pt = traj[fi];
+  const { t, x, vx, vy } = pt;
+  const y    = Math.max(0, pt.y);
+  const vMag = Math.hypot(vx, vy);
+  const vAng = Math.atan2(vy, vx) * 180 / Math.PI;
+  const rMag = Math.hypot(x, y);
+  const rAng = Math.atan2(y, x)  * 180 / Math.PI;
+  const { v0, angle, g } = P;
+  const { v0x, v0y, T, R, Hmax } = meta;
+
+  document.getElementById('tsl').value = fi;
+  document.getElementById('finfo').textContent =
+    `Cuadro ${fi}/${FR}  |  T = ${T.toFixed(2)}s  |  R = ${R.toFixed(1)}m  |  H = ${Hmax.toFixed(1)}m`;
+
+  const cards = [
+    { l: 't (s)',   v: t.toFixed(3)    },
+    { l: 'x (m)',  v: x.toFixed(2)    },
+    { l: 'y (m)',  v: y.toFixed(2)    },
+    { l: '|r| (m)', v: rMag.toFixed(2) },
+    { l: 'vₓ (m/s)', v: vx.toFixed(2)   },
+    { l: 'vᵧ (m/s)', v: vy.toFixed(2)   },
+    { l: '|v| (m/s)',v: vMag.toFixed(2) },
+    { l: '|a| (m/s²)',v: g.toFixed(2)   },
+  ];
+  document.getElementById('mc').innerHTML = cards
+    .map(c => `<div class="mcard"><div class="ml">${c.l}</div><div class="mv">${c.v}</div></div>`)
+    .join('');
+
+  const hG   = 0.5 * g * t * t;
+  const v0yt = v0y * t;
+  document.getElementById('ptb').innerHTML =
+`x(t) = v₀ₓ · t
+     = ${f2(v0x)} · ${f3(t)}
+     = ${hl(f2(x), '#0F6E56')} m
+
+y(t) = v₀ᵧ·t − ½g·t²
+     = ${f2(v0y)}·${f3(t)} − ½·${g}·${f3(t)}²
+     = ${f2(v0yt)} − ${f2(hG)}
+     = ${hl(f2(y), '#0F6E56')} m
+
+|r| = √(x² + y²)
+    = ${hl(f2(rMag), '#0F6E56')} m
+
+θᵣ = arctan(y/x)
+   = ${hl(f2(rAng) + '°', '#0F6E56')}`;
+
+  const gT = g * t;
+  document.getElementById('vtb').innerHTML =
+`vₓ(t) = v₀ₓ (cte.)
+      = ${hl(f2(vx), '#185FA5')} m/s
+
+vᵧ(t) = v₀ᵧ − g·t
+      = ${f2(v0y)} − ${f2(g)}·${f3(t)}
+      = ${f2(v0y)} − ${f2(gT)}
+      = ${hl(f2(vy), '#185FA5')} m/s
+
+|v| = √(vₓ² + vᵧ²)
+    = ${hl(f2(vMag), '#185FA5')} m/s
+
+θᵥ = arctan(vᵧ/vₓ)
+   = ${hl(f2(vAng) + '°', '#185FA5')}`;
+
+  document.getElementById('atb').innerHTML =
+`aₓ = 0 m/s²
+
+aᵧ = −g = ${hl('−' + f2(g), '#993C1D')} m/s²
+
+|a| = g = ${hl(f2(g), '#993C1D')} m/s²
+
+Descomposición inicial:
+v₀ₓ = ${v0}·cos(${angle}°)
+    = ${hl(f2(v0x), '#993C1D')} m/s
+
+v₀ᵧ = ${v0}·sin(${angle}°)
+    = ${hl(f2(v0y), '#993C1D')} m/s
+
+T = 2v₀ᵧ/g = ${hl(f2(T), '#993C1D')} s
+R = v₀²sin(2θ)/g
+  = ${hl(f2(R), '#993C1D')} m
+H = v₀ᵧ²/(2g)
+  = ${hl(f2(Hmax), '#993C1D')} m`;
+}
+
+/* ═══════════════════════════════════════════
+   LOOP DE ANIMACIÓN
+═══════════════════════════════════════════ */
+function animate(ts) {
+  if (!playing) return;
+  if (!lastTs) lastTs = ts;
+
+  const dt  = (ts - lastTs) / 1000;
+  lastTs    = ts;
+  const spd = parseFloat(document.getElementById('spd').value);
+  frame     = Math.min(FR, frame + dt * spd * FR / meta.T);
+
+  if (frame >= FR) {
+    frame   = FR;
+    playing = false;
+    document.getElementById('btnP').textContent = '▶ Play';
+  }
+
+  draw();
+  updateUI();
+  if (playing) rafId = requestAnimationFrame(animate);
+}
+
+/* ═══════════════════════════════════════════
+   CONTROLES
+═══════════════════════════════════════════ */
+function togglePlay() {
+  playing = !playing;
+  if (playing) {
+    if (frame >= FR) frame = 0;
+    document.getElementById('btnP').textContent = '⏸ Pausa';
+    lastTs = null;
+    rafId  = requestAnimationFrame(animate);
+  } else {
+    document.getElementById('btnP').textContent = '▶ Play';
+    if (rafId) cancelAnimationFrame(rafId);
+  }
+}
+
+function step(d) {
+  if (playing) {
+    playing = false;
+    document.getElementById('btnP').textContent = '▶ Play';
+    if (rafId) cancelAnimationFrame(rafId);
+  }
+  frame = Math.max(0, Math.min(FR, Math.round(frame) + d));
+  draw(); updateUI();
+}
+
+function seekTo(f) {
+  if (playing) {
+    playing = false;
+    document.getElementById('btnP').textContent = '▶ Play';
+    if (rafId) cancelAnimationFrame(rafId);
+  }
+  frame = f;
+  draw(); updateUI();
+}
+
+function resetS() {
+  if (playing) {
+    playing = false;
+    document.getElementById('btnP').textContent = '▶ Play';
+    if (rafId) cancelAnimationFrame(rafId);
+  }
+  frame = 0;
+  draw(); updateUI();
+}
+
+function applyP() {
+  P = {
+    v0:    Math.max(1,   Math.min(500, parseFloat(document.getElementById('pv0').value) || 49)),
+    angle: Math.max(1,   Math.min(89,  parseFloat(document.getElementById('pa').value)  || 45)),
+    g:     Math.max(0.1, Math.min(30,  parseFloat(document.getElementById('pg').value)  || 9.8)),
+  };
+  compute();
+  resetS();
+}
+
+/* ═══════════════════════════════════════════
+   INICIO
+═══════════════════════════════════════════ */
+compute();
+draw();
+updateUI();
+</script>
+
+</body>
+</html>
