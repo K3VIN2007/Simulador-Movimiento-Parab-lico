@@ -3,326 +3,714 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simulador de Movimiento Parabólico — Flecha</title>
+  <title>Simulador de Movimiento Parabólico</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg:        #080C14;
+      --bg2:       #0D1220;
+      --surface:   rgba(255,255,255,0.04);
+      --border:    rgba(255,255,255,0.08);
+      --border-hi: rgba(0,255,157,0.35);
+      --green:     #00FF9D;
+      --green-dim: #00C474;
+      --green-glow: rgba(0,255,157,0.18);
+      --blue:      #4D9FFF;
+      --blue-dim:  #2A6ECC;
+      --amber:     #FFB340;
+      --amber-dim: #CC8820;
+      --red:       #FF5C5C;
+      --text:      #E8EDF5;
+      --text-dim:  #7A8499;
+      --text-muted:#3D4560;
+      --pos:       #00FF9D;
+      --vel:       #4D9FFF;
+      --acc:       #FF5C5C;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: system-ui, sans-serif;
-      background: #ffffff;
-      color: #2C2C2A;
-      padding: 20px;
-      max-width: 900px;
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    /* ── Noise overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.6;
+    }
+
+    /* ── Grid bg ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,255,157,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,157,0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 1000px;
       margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 28px;
+      animation: slideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .header-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--green-dim), var(--green));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+      box-shadow: 0 0 24px var(--green-glow), inset 0 1px 0 rgba(255,255,255,0.2);
     }
 
     h1 {
-      font-size: 22px;
-      font-weight: 500;
-      margin-bottom: 4px;
-      color: #2C2C2A;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text);
+      line-height: 1.2;
+      text-shadow: 0 0 30px var(--green-glow);
     }
 
     .subtitle {
-      font-size: 14px;
-      color: #5F5E5A;
-      margin-bottom: 16px;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 5px;
+      letter-spacing: 0.4px;
     }
 
-    /* ── Controles de parámetros ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      background: rgba(0,255,157,0.1);
+      border: 1px solid rgba(0,255,157,0.2);
+      border-radius: 20px;
+      font-size: 10px;
+      color: var(--green);
+      font-weight: 500;
+      letter-spacing: 0.8px;
+      margin-top: 6px;
+    }
+
+    .badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* ── Glass panel ── */
+    .glass {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      backdrop-filter: blur(20px);
+    }
+
+    /* ── Parámetros ── */
     .params {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr) auto;
       gap: 12px;
-      align-items: center;
-      padding: 12px;
-      font-size: 13px;
-      color: #5F5E5A;
-      background: #F1EFE8;
-      border-radius: 8px;
-      margin-bottom: 14px;
+      align-items: end;
+      padding: 20px;
+      margin-bottom: 16px;
+      animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
     }
 
-    .params label {
+    .param-group {
       display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .param-header {
+      display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 6px;
+    }
+
+    .param-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
       font-weight: 500;
+      text-transform: uppercase;
     }
 
-    input[type="number"] {
-      padding: 5px 8px;
-      border: 0.5px solid #B4B2A9;
-      border-radius: 6px;
-      background: #fff;
-      font-size: 13px;
-      color: #2C2C2A;
-      outline: none;
-      font-family: monospace;
-    }
-
-    input[type="number"]:focus { 
-      border-color: #1D9E75; 
-      box-shadow: 0 0 0 2px rgba(29,158,117,0.1);
-    }
-
-    button {
-      padding: 6px 14px;
-      border: 0.5px solid #B4B2A9;
-      border-radius: 6px;
-      background: transparent;
-      font-size: 13px;
-      cursor: pointer;
-      color: #2C2C2A;
-      transition: all 0.15s;
-      font-weight: 500;
-    }
-
-    button:hover { 
-      background: #E1F5EE;
-      border-color: #1D9E75;
-    }
-    button:active { transform: scale(0.96); }
-
-    #finfo {
-      font-size: 12px;
-      color: #888780;
-      flex: 1;
+    .param-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--green);
+      min-width: 50px;
       text-align: right;
     }
 
+    .param-unit {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-left: 2px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.08);
+      outline: none;
+      cursor: pointer;
+      position: relative;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--green);
+      cursor: pointer;
+      box-shadow: 0 0 0 3px rgba(0,255,157,0.2), 0 0 12px var(--green-glow);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      box-shadow: 0 0 0 5px rgba(0,255,157,0.15), 0 0 20px var(--green-glow);
+    }
+
+    input[type="number"] {
+      width: 70px;
+      padding: 6px 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      outline: none;
+      text-align: center;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input[type="number"]:focus {
+      border-color: var(--green-dim);
+      box-shadow: 0 0 0 3px var(--green-glow);
+    }
+
+    .btn-apply {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, var(--green-dim), var(--green));
+      border: none;
+      border-radius: 10px;
+      color: #0A1A12;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 20px rgba(0,255,157,0.25);
+      white-space: nowrap;
+    }
+
+    .btn-apply:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 28px rgba(0,255,157,0.35);
+    }
+
+    .btn-apply:active {
+      transform: scale(0.97) translateY(0);
+    }
+
     /* ── Canvas ── */
+    .canvas-wrap {
+      position: relative;
+      margin-bottom: 14px;
+      border-radius: 16px;
+      overflow: hidden;
+      animation: fadeIn 0.6s ease 0.2s both;
+    }
+
     #simc {
       display: block;
       width: 100%;
-      border-radius: 8px;
-      border: 0.5px solid #D3D1C7;
-      background: #f7f6f3;
-      margin-bottom: 12px;
+      border-radius: 16px;
     }
 
-    /* ── Leyenda ── */
+    /* ── Event flash overlay ── */
+    .event-flash {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: rgba(0,255,157,0.15);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      color: var(--green);
+      letter-spacing: 1px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      white-space: nowrap;
+      box-shadow: 0 0 20px rgba(0,255,157,0.2);
+    }
+
+    .event-flash.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Legend ── */
     .legend {
       display: flex;
       flex-wrap: wrap;
       gap: 16px;
-      padding: 8px 0;
-      font-size: 12px;
-      color: #5F5E5A;
+      padding: 14px 18px;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 14px;
+      animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
     }
 
-    .legend span {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .leg-line {
-      display: inline-block;
-      width: 20px;
-      height: 2.5px;
-      border-radius: 2px;
-    }
-
-    /* ── Controles de reproducción ── */
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      padding: 10px 0 12px;
-      border-bottom: 0.5px solid #D3D1C7;
-      margin-bottom: 12px;
-    }
-
-    #btnP { min-width: 95px; }
-
-    .speed-label {
-      font-size: 12px;
-      color: #5F5E5A;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 500;
-    }
-
-    input[type="range"] {
-      vertical-align: middle;
-      accent-color: #1D9E75;
-      cursor: pointer;
-    }
-
-    .tsl-wrap {
+    .legend-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      flex: 1;
-      min-width: 160px;
-      font-size: 12px;
-      color: #5F5E5A;
-      font-weight: 500;
-    }
-
-    #tsl { flex: 1; }
-
-    /* ── Mini-tarjetas de métricas ── */
-    #mc {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-      gap: 8px;
-      padding: 0 0 12px;
-      margin-bottom: 12px;
-    }
-
-    .mcard {
-      background: #F1EFE8;
-      border-radius: 6px;
-      padding: 8px 10px;
-      border: 0.5px solid rgba(212,208,197,0.5);
-    }
-
-    .mcard .ml {
-      font-size: 10px;
-      color: #888780;
-      margin-bottom: 3px;
-      font-weight: 500;
+      font-size: 11px;
+      color: var(--text-dim);
       letter-spacing: 0.3px;
     }
 
-    .mcard .mv {
-      font-size: 14px;
-      font-weight: 500;
-      font-family: monospace;
-      color: #2C2C2A;
+    .leg-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
     }
 
-    /* ── Cajas de cálculo ── */
+    .leg-line {
+      width: 20px;
+      height: 2px;
+      border-radius: 1px;
+    }
+
+    /* ── Controles ── */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: rgba(255,255,255,0.09);
+      border-color: rgba(255,255,255,0.15);
+      color: var(--text);
+    }
+
+    .btn:active { transform: scale(0.96); }
+
+    #btnP {
+      min-width: 108px;
+      background: rgba(0,255,157,0.08);
+      border-color: rgba(0,255,157,0.3);
+      color: var(--green);
+      font-weight: 500;
+    }
+
+    #btnP:hover {
+      background: rgba(0,255,157,0.14);
+      border-color: rgba(0,255,157,0.5);
+      box-shadow: 0 0 20px rgba(0,255,157,0.1);
+    }
+
+    .ctrl-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .speed-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    #spd {
+      width: 64px;
+    }
+
+    .speed-val {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      color: var(--amber);
+      min-width: 32px;
+    }
+
+    .timeline-wrap {
+      flex: 1;
+      min-width: 120px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .timeline-wrap input[type="range"] {
+      background: rgba(255,255,255,0.06);
+    }
+
+    #tsl::-webkit-slider-thumb {
+      background: var(--amber);
+      box-shadow: 0 0 0 3px rgba(255,179,64,0.2), 0 0 12px rgba(255,179,64,0.4);
+    }
+
+    .finfo {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+      margin-left: auto;
+    }
+
+    /* ── Metric cards ── */
+    #mc {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+      animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+    }
+
+    .mcard {
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      transition: border-color 0.3s, box-shadow 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mcard::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent);
+      pointer-events: none;
+    }
+
+    .mcard.highlight {
+      border-color: rgba(0,255,157,0.3);
+      box-shadow: 0 0 20px rgba(0,255,157,0.06);
+    }
+
+    .ml {
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .mv {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      transition: color 0.3s;
+    }
+
+    /* ── Calc boxes ── */
     .calcs {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(3, 1fr);
       gap: 12px;
-      padding: 0;
+      animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both;
     }
 
     .cbx {
-      background: #F1EFE8;
-      border-radius: 8px;
-      padding: 12px 14px;
-      border: 0.5px solid rgba(212,208,197,0.5);
+      padding: 16px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
     }
 
     .cbx .ctitle {
-      font-size: 13px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
       font-weight: 600;
-      margin-bottom: 8px;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 8px;
+    }
+
+    .ctitle-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
     }
 
     .cbx pre {
-      font-family: 'Courier New', monospace;
+      font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
-      line-height: 1.7;
-      margin: 0;
+      line-height: 1.9;
+      color: var(--text-dim);
       white-space: pre-wrap;
       word-wrap: break-word;
-      color: #5F5E5A;
     }
 
-    /* ── Colores de vectores ── */
-    .col-pos { color: #0F6E56; }
-    .col-vel { color: #185FA5; }
-    .col-acc { color: #993C1D; }
+    .col-pos { color: var(--pos); }
+    .col-vel { color: var(--vel); }
+    .col-acc { color: var(--acc); }
 
-    /* ── Encabezado con info ── */
-    .info-box {
-      background: #E8F4F0;
-      border-left: 3px solid #1D9E75;
-      padding: 10px 12px;
-      border-radius: 4px;
-      margin-bottom: 14px;
-      font-size: 12px;
-      color: #2C2C2A;
+    /* ── Animations ── */
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
-    .info-box strong {
-      color: #0F6E56;
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes shimmer {
+      from { background-position: -200% center; }
+      to   { background-position: 200% center; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .params { grid-template-columns: 1fr 1fr; }
+      .btn-apply { grid-column: span 2; }
+      #mc { grid-template-columns: repeat(2, 1fr); }
+      .calcs { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 460px) {
+      .params { grid-template-columns: 1fr; }
+      .btn-apply { grid-column: span 1; }
     }
   </style>
 </head>
 <body>
+<div class="app">
 
-  <h1>Simulador de Movimiento Parabólico</h1>
-  <p class="subtitle">Análisis dinámico del lanzamiento de una flecha: v₀ = 49 m/s, θ = 45°</p>
-
-  <div class="info-box">
-    <strong>Instrucciones:</strong> Ajusta los parámetros, presiona "Aplicar" y usa los controles para reproducir la animación. 
-    Observa en tiempo real cómo varían posición, velocidad y aceleración.
-  </div>
-
-  <!-- Parámetros modificables -->
-  <div class="params">
-    <label>v₀ (m/s): <input type="number" id="pv0" value="49" min="1" max="500" step="1"></label>
-    <label>θ (°):    <input type="number" id="pa"  value="45" min="1" max="89"  step="1"></label>
-    <label>g (m/s²): <input type="number" id="pg"  value="9.8" min="0.1" max="30" step="0.1"></label>
-    <button onclick="applyP()">✓ Aplicar</button>
-    <span id="finfo"></span>
-  </div>
-
-  <!-- Canvas principal -->
-  <canvas id="simc" height="380"></canvas>
-
-  <!-- Leyenda -->
-  <div class="legend">
-    <span><span class="leg-line" style="background:#0F6E56"></span>posición (r)</span>
-    <span><span class="leg-line" style="background:#185FA5"></span>velocidad (v)</span>
-    <span><span class="leg-line" style="background:#993C1D"></span>aceleración (a)</span>
-    <span><span class="leg-line" style="background:#888780;border-top:2px dashed #888780;height:0;background:none"></span>trayectoria</span>
-  </div>
-
-  <!-- Controles de reproducción -->
-  <div class="controls">
-    <button onclick="step(-20)" title="−20 cuadros">⏮ Inicio</button>
-    <button onclick="step(-1)"  title="−1 cuadro">◀</button>
-    <button id="btnP" onclick="togglePlay()">▶ Play</button>
-    <button onclick="step(1)"   title="+1 cuadro">▶</button>
-    <button onclick="step(20)"  title="+20 cuadros">Final ⏭</button>
-    <button onclick="resetS()">↺ Reiniciar</button>
-
-    <label class="speed-label">Velocidad:
-      <input type="range" id="spd" min="0.2" max="6" step="0.2" value="1" style="width:70px"
-        oninput="document.getElementById('sv').textContent = parseFloat(this.value).toFixed(1) + '×'">
-      <span id="sv" style="min-width:32px;display:inline-block">1.0×</span>
-    </label>
-
-    <div class="tsl-wrap">
-      t: <input type="range" id="tsl" min="0" max="300" value="0"
-           oninput="seekTo(parseInt(this.value))">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">🏹</div>
+    <div>
+      <h1>MOVIMIENTO PARABÓLICO</h1>
+      <p class="subtitle">Simulador de lanzamiento de proyectil — análisis de vectores en tiempo real</p>
+      <div class="badge">SIMULACIÓN ACTIVA</div>
     </div>
   </div>
 
-  <!-- Mini-tarjetas numéricas -->
-  <div id="mc"></div>
+  <!-- Parámetros -->
+  <div class="glass params">
+    <div class="param-group">
+      <div class="param-header">
+        <span class="param-label">Velocidad inicial v₀</span>
+        <span class="param-value" id="dv0">49<span class="param-unit">m/s</span></span>
+      </div>
+      <input type="range" id="rv0" min="1" max="200" step="1" value="49"
+        oninput="document.getElementById('dv0').innerHTML=this.value+'<span class=\'param-unit\'>m/s</span>'">
+    </div>
 
-  <!-- Cálculos paso a paso -->
-  <div class="calcs">
-    <div class="cbx"><div class="ctitle col-pos">📍 Posición</div><pre id="ptb"></pre></div>
-    <div class="cbx"><div class="ctitle col-vel">→ Velocidad</div><pre id="vtb"></pre></div>
-    <div class="cbx"><div class="ctitle col-acc">⬇ Aceleración</div><pre id="atb"></pre></div>
+    <div class="param-group">
+      <div class="param-header">
+        <span class="param-label">Ángulo θ</span>
+        <span class="param-value" id="da">45<span class="param-unit">°</span></span>
+      </div>
+      <input type="range" id="ra" min="1" max="89" step="1" value="45"
+        oninput="document.getElementById('da').innerHTML=this.value+'<span class=\'param-unit\'>°</span>'">
+    </div>
+
+    <div class="param-group">
+      <div class="param-header">
+        <span class="param-label">Gravedad g</span>
+        <span class="param-value" id="dg">9.8<span class="param-unit">m/s²</span></span>
+      </div>
+      <input type="range" id="rg" min="0.1" max="25" step="0.1" value="9.8"
+        oninput="document.getElementById('dg').innerHTML=parseFloat(this.value).toFixed(1)+'<span class=\'param-unit\'>m/s²</span>'">
+    </div>
+
+    <button class="btn-apply" onclick="applyP()">▶ APLICAR</button>
   </div>
 
-<script>
-/* ═══════════════════════════════════════════
-   CONFIGURACIÓN DEL CANVAS
-═══════════════════════════════════════════ */
-const cv  = document.getElementById('simc');
-const cx  = cv.getContext('2d');
+  <!-- Canvas -->
+  <div class="canvas-wrap glass">
+    <canvas id="simc" height="400"></canvas>
+    <div class="event-flash" id="evFlash"></div>
+  </div>
 
-const CW = 760, CH = 380;
-const ML = 65, MR = 20, MT = 28, MB = 50;
+  <!-- Leyenda -->
+  <div class="glass legend">
+    <div class="legend-item">
+      <div class="leg-dot" style="background:var(--pos); box-shadow:0 0 6px var(--pos)"></div>
+      posición <strong style="color:var(--pos)">r</strong>
+    </div>
+    <div class="legend-item">
+      <div class="leg-dot" style="background:var(--vel); box-shadow:0 0 6px var(--vel)"></div>
+      velocidad <strong style="color:var(--vel)">v</strong>
+    </div>
+    <div class="legend-item">
+      <div class="leg-dot" style="background:var(--acc); box-shadow:0 0 6px var(--acc)"></div>
+      aceleración <strong style="color:var(--acc)">a</strong>
+    </div>
+    <div class="legend-item">
+      <div class="leg-line" style="background:rgba(255,255,255,0.2)"></div>
+      trayectoria completa
+    </div>
+    <div class="legend-item" style="margin-left:auto">
+      <span style="color:var(--amber); font-size:10px; letter-spacing:0.5px">⏸ Pausa automática en ápice</span>
+    </div>
+  </div>
+
+  <!-- Controles -->
+  <div class="glass controls">
+    <button class="btn" onclick="step(-9999)" title="Al inicio">⏮</button>
+    <button class="btn" onclick="step(-1)"  title="−1 frame">◀</button>
+    <button class="btn" id="btnP" onclick="togglePlay()">▶ PLAY</button>
+    <button class="btn" onclick="step(1)"   title="+1 frame">▶</button>
+    <button class="btn" onclick="step(9999)" title="Al final">⏭</button>
+    <button class="btn" onclick="resetS()">↺</button>
+
+    <div class="ctrl-divider"></div>
+
+    <div class="speed-wrap">
+      <span>VEL</span>
+      <input type="range" id="spd" min="0.2" max="6" step="0.2" value="1"
+        oninput="document.getElementById('sv').textContent = parseFloat(this.value).toFixed(1)+'×'">
+      <span class="speed-val" id="sv">1.0×</span>
+    </div>
+
+    <div class="ctrl-divider"></div>
+
+    <div class="timeline-wrap">
+      <span>t:</span>
+      <input type="range" id="tsl" min="0" max="300" value="0"
+        oninput="seekTo(parseInt(this.value))">
+    </div>
+
+    <span class="finfo" id="finfo">—</span>
+  </div>
+
+  <!-- Metric cards -->
+  <div id="mc"></div>
+
+  <!-- Calc boxes -->
+  <div class="calcs">
+    <div class="cbx">
+      <div class="ctitle col-pos">
+        <div class="ctitle-dot" style="background:var(--pos); box-shadow:0 0 8px var(--pos)"></div>
+        POSICIÓN
+      </div>
+      <pre id="ptb"></pre>
+    </div>
+    <div class="cbx">
+      <div class="ctitle col-vel">
+        <div class="ctitle-dot" style="background:var(--vel); box-shadow:0 0 8px var(--vel)"></div>
+        VELOCIDAD
+      </div>
+      <pre id="vtb"></pre>
+    </div>
+    <div class="cbx">
+      <div class="ctitle col-acc">
+        <div class="ctitle-dot" style="background:var(--acc); box-shadow:0 0 8px var(--acc)"></div>
+        ACELERACIÓN
+      </div>
+      <pre id="atb"></pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ════════════════════════════════════════════
+   CANVAS CONFIG
+════════════════════════════════════════════ */
+const cv = document.getElementById('simc');
+const cx = cv.getContext('2d');
+
+const CW = 900, CH = 400;
+const ML = 68, MR = 22, MT = 32, MB = 54;
 const DW = CW - ML - MR;
 const DH = CH - MT - MB;
 
@@ -331,51 +719,45 @@ cv.width  = CW * DPR;
 cv.height = CH * DPR;
 cx.scale(DPR, DPR);
 
-/* ═══════════════════════════════════════════
-   PARÁMETROS DE LA SIMULACIÓN
-═══════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   COLORES
+════════════════════════════════════════════ */
+const C = {
+  bg:    '#080C14',
+  bg2:   '#0D1220',
+  grid:  'rgba(0,255,157,0.04)',
+  ax:    'rgba(255,255,255,0.25)',
+  lb:    'rgba(255,255,255,0.35)',
+  trail: '#080C14',
+  pos:   '#00FF9D',
+  vel:   '#4D9FFF',
+  acc:   '#FF5C5C',
+  dot:   '#FFFFFF',
+  ghost: 'rgba(255,255,255,0.08)',
+  peak:  '#FFB340',
+};
+
+/* ════════════════════════════════════════════
+   PARÁMETROS
+════════════════════════════════════════════ */
 let P    = { v0: 49, angle: 45, g: 9.8 };
 let meta = {};
 let traj = [];
 let sc   = 1;
-
 const FR = 300;
 
-/* ═══════════════════════════════════════════
-   ESTADO DE LA ANIMACIÓN
-═══════════════════════════════════════════ */
-let frame   = 0;
-let playing = false;
-let rafId   = null;
-let lastTs  = null;
-
-/* 🔴 NUEVO: control de pausa en el punto más alto */
+let frame        = 0;
+let playing      = false;
+let rafId        = null;
+let lastTs       = null;
 let pausedAtPeak = false;
 
-/* ═══════════════════════════════════════════
-   PALETA DE COLORES
-═══════════════════════════════════════════ */
-const C = {
-  bg:  '#f7f6f3',
-  gr:  '#e0ddd5',
-  ax:  '#888780',
-  lb:  '#5F5E5A',
-  gh:  '#c5c2ba',
-  dot: '#2C2C2A',
-  pos: '#0F6E56',
-  vel: '#185FA5',
-  acc: '#993C1D',
-};
-
-/* ═══════════════════════════════════════════
-   FUNCIONES DE TRANSFORMACIÓN DE COORDENADAS
-═══════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════ */
 function TX(x) { return ML + x * sc; }
 function TY(y) { return CH - MB - y * sc; }
 
-/* ═══════════════════════════════════════════
-   CÁLCULO DE LA TRAYECTORIA
-═══════════════════════════════════════════ */
 function compute() {
   const { v0, angle, g } = P;
   const th  = angle * Math.PI / 180;
@@ -383,99 +765,108 @@ function compute() {
   const v0y = v0 * Math.sin(th);
   const T   = 2 * v0y / g;
   const R   = v0x * T;
-  const Hmax = (v0y * v0y) / (2 * g);
-
+  const Hmax = v0y * v0y / (2 * g);
   meta = { T, R, Hmax, v0x, v0y };
-
   traj = [];
   for (let i = 0; i <= FR; i++) {
-    const t  = (i / FR) * T;
-    const x  = v0x * t;
-    const y  = v0y * t - 0.5 * g * t * t;
+    const t = (i / FR) * T;
     traj.push({
-      t,
-      x,
-      y,
-      vx: v0x,
-      vy: v0y - g * t,
-      ax: 0,
-      ay: -g,
+      t, x: v0x * t,
+      y: v0y * t - 0.5 * g * t * t,
+      vx: v0x, vy: v0y - g * t,
     });
   }
-
   const sx = DW / (R    * 1.08);
   const sy = DH / (Hmax * 1.22);
   sc = Math.min(sx, sy);
 }
 
-/* ═══════════════════════════════════════════
-   DIBUJAR FLECHA CON PUNTA
-═══════════════════════════════════════════ */
-function arw(x1, y1, x2, y2, col, lw) {
-  const dx  = x2 - x1, dy = y2 - y1;
+/* Draw arrow with glow */
+function arw(x1, y1, x2, y2, col, lw, glow) {
+  const dx = x2 - x1, dy = y2 - y1;
   const len = Math.hypot(dx, dy);
   if (len < 2.5) return;
-
-  const HL  = Math.min(11, len * 0.45);
+  const HL  = Math.min(12, len * 0.45);
   const ang = Math.atan2(dy, dx);
   const eL  = len - HL * 0.65;
   const ex  = x1 + (dx / len) * eL;
   const ey  = y1 + (dy / len) * eL;
 
   cx.save();
+  if (glow) {
+    cx.shadowColor = col;
+    cx.shadowBlur  = 12;
+  }
   cx.strokeStyle = col;
   cx.fillStyle   = col;
   cx.lineWidth   = lw;
   cx.lineCap     = 'round';
-
+  cx.globalAlpha = 0.92;
   cx.beginPath(); cx.moveTo(x1, y1); cx.lineTo(ex, ey); cx.stroke();
-
   cx.beginPath();
   cx.moveTo(x2, y2);
   cx.lineTo(x2 - HL * Math.cos(ang - 0.4), y2 - HL * Math.sin(ang - 0.4));
   cx.lineTo(x2 - HL * Math.cos(ang + 0.4), y2 - HL * Math.sin(ang + 0.4));
-  cx.closePath();
-  cx.fill();
+  cx.closePath(); cx.fill();
   cx.restore();
 }
 
-/* ═══════════════════════════════════════════
-   DIBUJAR LÍNEA PUNTEADA
-═══════════════════════════════════════════ */
 function dsh(x1, y1, x2, y2, col) {
   cx.save();
-  cx.strokeStyle   = col;
-  cx.lineWidth     = 1;
-  cx.globalAlpha   = 0.4;
-  cx.setLineDash([4, 4]);
+  cx.strokeStyle = col;
+  cx.lineWidth   = 1;
+  cx.globalAlpha = 0.3;
+  cx.setLineDash([4, 5]);
   cx.beginPath(); cx.moveTo(x1, y1); cx.lineTo(x2, y2); cx.stroke();
   cx.restore();
 }
 
-/* ═══════════════════════════════════════════
-   CALCULAR PASO "BONITO" PARA LA CUADRÍCULA
-═══════════════════════════════════════════ */
 function niceStep(v) {
   const p = Math.pow(10, Math.floor(Math.log10(v)));
   const n = v / p;
   return p * (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10);
 }
 
-/* ═══════════════════════════════════════════
-   FUNCIÓN PRINCIPAL DE DIBUJO
-═══════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   DRAW
+════════════════════════════════════════════ */
 function draw() {
   cx.clearRect(0, 0, CW, CH);
-  cx.fillStyle = C.bg;
+
+  /* ── Background gradient ── */
+  const bgGrad = cx.createLinearGradient(0, 0, 0, CH);
+  bgGrad.addColorStop(0, '#0A0F1C');
+  bgGrad.addColorStop(1, '#060A10');
+  cx.fillStyle = bgGrad;
   cx.fillRect(0, 0, CW, CH);
 
+  /* ── Stars ── */
+  cx.save();
+  const stars = getStars();
+  for (const s of stars) {
+    cx.globalAlpha = s.a;
+    cx.fillStyle   = '#fff';
+    cx.beginPath();
+    cx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    cx.fill();
+  }
+  cx.restore();
+
+  /* ── Ground gradient ── */
+  const gy = CH - MB;
+  const groundGrad = cx.createLinearGradient(0, gy, 0, CH);
+  groundGrad.addColorStop(0, 'rgba(0,255,157,0.04)');
+  groundGrad.addColorStop(1, 'rgba(0,255,157,0.01)');
+  cx.fillStyle = groundGrad;
+  cx.fillRect(0, gy, CW, CH - gy);
+
   const { R, Hmax, v0x, v0y } = meta;
-  const stX = niceStep(R    / 6);
+  const stX = niceStep(R / 6);
   const stY = niceStep(Hmax / 4);
 
-  /* ── Cuadrícula ── */
+  /* ── Grid lines ── */
   cx.save();
-  cx.strokeStyle = C.gr;
+  cx.strokeStyle = 'rgba(0,255,157,0.06)';
   cx.lineWidth   = 0.5;
   for (let x = 0; x <= R * 1.1; x += stX) {
     cx.beginPath(); cx.moveTo(TX(x), MT); cx.lineTo(TX(x), CH - MB); cx.stroke();
@@ -486,19 +877,19 @@ function draw() {
   }
   cx.restore();
 
-  /* ── Ejes ── */
+  /* ── Axes ── */
   cx.save();
-  cx.strokeStyle = C.ax;
+  cx.strokeStyle = 'rgba(255,255,255,0.2)';
   cx.lineWidth   = 1.2;
   cx.beginPath();
   cx.moveTo(ML, MT); cx.lineTo(ML, CH - MB); cx.lineTo(CW - MR, CH - MB);
   cx.stroke();
   cx.restore();
 
-  /* ── Etiquetas de ejes ── */
+  /* ── Axis tick labels ── */
   cx.save();
-  cx.fillStyle  = C.lb;
-  cx.font       = '11px monospace';
+  cx.fillStyle  = 'rgba(255,255,255,0.3)';
+  cx.font       = '10px JetBrains Mono, monospace';
   cx.textAlign  = 'center';
   for (let x = stX; x <= R * 1.08; x += stX) {
     cx.fillText(x.toFixed(0), TX(x), CH - MB + 16);
@@ -506,12 +897,12 @@ function draw() {
   cx.textAlign = 'right';
   for (let y = stY; y <= Hmax * 1.25; y += stY) {
     if (TY(y) < MT + 5) break;
-    cx.fillText(y.toFixed(0), ML - 6, TY(y) + 4);
+    cx.fillText(y.toFixed(0), ML - 8, TY(y) + 4);
   }
-  cx.font      = '12px sans-serif';
-  cx.fillStyle = C.ax;
+  cx.font      = '11px JetBrains Mono, monospace';
+  cx.fillStyle = 'rgba(255,255,255,0.2)';
   cx.textAlign = 'center';
-  cx.fillText('x (m)', ML + DW / 2, CH - 6);
+  cx.fillText('x (m)', ML + DW / 2, CH - 8);
   cx.save();
     cx.translate(14, MT + DH / 2);
     cx.rotate(-Math.PI / 2);
@@ -519,11 +910,11 @@ function draw() {
   cx.restore();
   cx.restore();
 
-  /* ── Trayectoria completa ── */
+  /* ── Full trajectory (ghost) ── */
   cx.save();
-  cx.strokeStyle = C.gh;
+  cx.strokeStyle = 'rgba(255,255,255,0.07)';
   cx.lineWidth   = 1;
-  cx.setLineDash([3, 4]);
+  cx.setLineDash([4, 5]);
   cx.beginPath();
   for (let i = 0; i <= FR; i++) {
     const p = traj[i];
@@ -533,37 +924,47 @@ function draw() {
   cx.stroke();
   cx.restore();
 
-  /* ── Líneas guía ── */
+  /* ── Peak & range guide lines ── */
   const tPk = v0y / P.g;
   const xPk = v0x * tPk;
   cx.save();
-  cx.strokeStyle = C.gh;
-  cx.lineWidth   = 0.5;
-  cx.setLineDash([2, 4]);
+  cx.strokeStyle = 'rgba(255,179,64,0.2)';
+  cx.lineWidth   = 0.8;
+  cx.setLineDash([3, 5]);
   cx.beginPath(); cx.moveTo(ML, TY(Hmax)); cx.lineTo(TX(xPk), TY(Hmax)); cx.stroke();
-  cx.beginPath(); cx.moveTo(TX(R), CH - MB); cx.lineTo(TX(R), CH - MB + 6); cx.stroke();
-  cx.fillStyle  = C.lb;
-  cx.font       = '10px monospace';
-  cx.textAlign  = 'left';
-  cx.fillText('H=' + Hmax.toFixed(1) + 'm', ML + 4, TY(Hmax) - 4);
-  cx.textAlign  = 'center';
-  cx.fillText('R=' + R.toFixed(1) + 'm', TX(R), CH - MB + 28);
+  cx.beginPath(); cx.moveTo(TX(xPk), TY(Hmax)); cx.lineTo(TX(xPk), CH - MB); cx.stroke();
   cx.restore();
 
-  /* ── Estela de puntos ── */
-  const fi = Math.min(FR, Math.floor(frame));
+  /* Labels H and R */
   cx.save();
-  for (let i = Math.max(0, fi - 50); i < fi; i++) {
-    const alpha  = 0.05 + 0.65 * ((i - (fi - 50)) / 50);
-    const radius = 1.0  + 2.5 * ((i - (fi - 50)) / 50);
-    cx.fillStyle = `rgba(15,110,86,${alpha})`;
+  cx.fillStyle = 'rgba(255,179,64,0.6)';
+  cx.font      = '10px JetBrains Mono, monospace';
+  cx.textAlign = 'left';
+  cx.fillText('H=' + Hmax.toFixed(1) + 'm', ML + 4, TY(Hmax) - 6);
+  cx.textAlign = 'center';
+  cx.fillText('R=' + R.toFixed(1) + 'm', TX(R), CH - MB + 30);
+  cx.restore();
+
+  /* ── Glowing trail ── */
+  const fi = Math.min(FR, Math.floor(frame));
+  const trailLen = 70;
+  cx.save();
+  for (let i = Math.max(0, fi - trailLen); i < fi; i++) {
+    const prog  = (i - (fi - trailLen)) / trailLen;
+    const alpha = 0.04 + 0.7 * prog;
+    const r     = 1.2 + 3.5 * prog;
+    const gAlpha = alpha * 0.6;
+    // Glow layer
+    cx.shadowColor = C.pos;
+    cx.shadowBlur  = 8 * prog;
+    cx.fillStyle   = `rgba(0,255,157,${gAlpha})`;
     cx.beginPath();
-    cx.arc(TX(traj[i].x), TY(Math.max(0, traj[i].y)), radius, 0, Math.PI * 2);
+    cx.arc(TX(traj[i].x), TY(Math.max(0, traj[i].y)), r, 0, Math.PI * 2);
     cx.fill();
   }
   cx.restore();
 
-  /* ── Punto y vectores ── */
+  /* ── Current point ── */
   const pt = traj[fi];
   const px = TX(pt.x);
   const py = TY(Math.max(0, pt.y));
@@ -571,86 +972,149 @@ function draw() {
 
   /* Vector POSICIÓN */
   if (Math.hypot(px - ox, py - oy) > 4) {
-    arw(ox, oy, px, py, C.pos, 2.8);
+    arw(ox, oy, px, py, C.pos, 2.5, true);
     cx.save();
-    cx.fillStyle = C.pos;
-    cx.font      = 'bold 13px sans-serif';
-    cx.textAlign = 'left';
-    cx.fillText('r', (ox + px) / 2 + 8, (oy + py) / 2 - 6);
+    cx.fillStyle  = C.pos;
+    cx.font       = 'bold 13px sans-serif';
+    cx.textAlign  = 'left';
+    cx.shadowColor = C.pos;
+    cx.shadowBlur  = 10;
+    cx.fillText('r', (ox + px) / 2 + 10, (oy + py) / 2 - 8);
     cx.restore();
   }
 
   /* Vector VELOCIDAD */
-  const VS  = 85 / P.v0;
+  const VS  = 80 / P.v0;
   const vdx = pt.vx * VS;
   const vdy = -pt.vy * VS;
   dsh(px, py, px + vdx, py, C.vel);
   dsh(px + vdx, py, px + vdx, py + vdy, C.vel);
-  arw(px, py, px + vdx, py + vdy, C.vel, 2.8);
+  arw(px, py, px + vdx, py + vdy, C.vel, 2.5, true);
   cx.save();
-  cx.fillStyle = C.vel;
-  cx.font      = 'bold 13px sans-serif';
-  cx.textAlign = 'left';
-  cx.fillText('v', px + vdx + (vdx >= 0 ? 8 : -22), py + vdy - 6);
+  cx.fillStyle   = C.vel;
+  cx.font        = 'bold 13px sans-serif';
+  cx.shadowColor = C.vel;
+  cx.shadowBlur  = 10;
+  cx.textAlign   = 'left';
+  cx.fillText('v', px + vdx + (vdx >= 0 ? 8 : -24), py + vdy - 6);
   cx.restore();
 
   /* Vector ACELERACIÓN */
-  const AS = 65 / P.g;
-  arw(px, py, px, py + P.g * AS, C.acc, 2.8);
+  const AS = 60 / P.g;
+  arw(px, py, px, py + P.g * AS, C.acc, 2.5, true);
   cx.save();
-  cx.fillStyle = C.acc;
-  cx.font      = 'bold 13px sans-serif';
-  cx.textAlign = 'left';
-  cx.fillText('a', px + 9, py + P.g * AS * 0.5 + 5);
+  cx.fillStyle   = C.acc;
+  cx.font        = 'bold 13px sans-serif';
+  cx.shadowColor = C.acc;
+  cx.shadowBlur  = 10;
+  cx.textAlign   = 'left';
+  cx.fillText('a', px + 10, py + P.g * AS * 0.5 + 5);
   cx.restore();
 
-  /* ── Flecha en 3D ── */
+  /* ── Flecha (proyectil) ── */
   const ma = Math.atan2(-pt.vy, pt.vx);
   cx.save();
   cx.translate(px, py);
   cx.rotate(ma);
-  cx.fillStyle   = C.dot;
-  cx.strokeStyle = C.dot;
-  cx.lineWidth   = 1.8;
+  cx.shadowColor = 'rgba(255,255,255,0.5)';
+  cx.shadowBlur  = 8;
+  cx.fillStyle   = '#fff';
+  cx.fillRect(-13, -2, 13, 4);
+  cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(-7, -5); cx.lineTo(-7, 5); cx.closePath(); cx.fill();
+  cx.strokeStyle = 'rgba(255,255,255,0.5)';
+  cx.lineWidth   = 1.5;
   cx.lineCap     = 'round';
-  cx.fillRect(-11, -1.8, 11, 3.6);
-  cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(-6, -4.5); cx.lineTo(-6, 4.5); cx.closePath(); cx.fill();
-  cx.beginPath(); cx.moveTo(-11, 0); cx.lineTo(-18, -5); cx.stroke();
-  cx.beginPath(); cx.moveTo(-11, 0); cx.lineTo(-18,  5); cx.stroke();
+  cx.beginPath(); cx.moveTo(-13, 0); cx.lineTo(-21, -5); cx.stroke();
+  cx.beginPath(); cx.moveTo(-13, 0); cx.lineTo(-21,  5); cx.stroke();
   cx.restore();
-  cx.beginPath(); cx.arc(px, py, 4, 0, Math.PI * 2);
-  cx.fillStyle = C.dot; cx.fill();
 
-  /* ── Ángulo inicial ── */
+  /* Dot glow */
+  cx.save();
+  cx.shadowColor = '#fff';
+  cx.shadowBlur  = 16;
+  cx.fillStyle   = '#fff';
+  cx.beginPath(); cx.arc(px, py, 3.5, 0, Math.PI * 2); cx.fill();
+  cx.restore();
+
+  /* ── Initial angle arc ── */
   if (fi === 0) {
-    const th = P.angle * Math.PI / 180, ar = 35;
+    const th = P.angle * Math.PI / 180, ar = 38;
     cx.save();
-    cx.strokeStyle = C.lb;
-    cx.lineWidth   = 1;
-    cx.setLineDash([2, 3]);
+    cx.strokeStyle = 'rgba(255,179,64,0.5)';
+    cx.lineWidth   = 1.2;
+    cx.setLineDash([3, 4]);
     cx.beginPath(); cx.arc(ox, oy, ar, -th, 0, true); cx.stroke();
-    cx.fillStyle  = C.lb;
-    cx.font       = '11px sans-serif';
-    cx.fillText('θ=' + P.angle + '°', ox + ar * Math.cos(-th / 2) + 3, oy + ar * Math.sin(-th / 2) - 2);
+    cx.fillStyle   = 'rgba(255,179,64,0.7)';
+    cx.font        = '11px JetBrains Mono, monospace';
+    cx.fillText('θ=' + P.angle + '°', ox + ar * Math.cos(-th / 2) + 4, oy + ar * Math.sin(-th / 2) - 2);
     cx.restore();
   }
 
   /* ── HUD ── */
   cx.save();
-  cx.fillStyle  = C.lb;
-  cx.font       = '12px monospace';
-  cx.textAlign  = 'right';
-  cx.fillText('t = ' + pt.t.toFixed(3) + ' s', CW - MR - 6, MT + 14);
-  cx.fillText('cuadro ' + fi + '/' + FR, CW - MR - 6, MT + 28);
+  cx.fillStyle = 'rgba(255,255,255,0.28)';
+  cx.font      = '11px JetBrains Mono, monospace';
+  cx.textAlign = 'right';
+  cx.fillText('t = ' + pt.t.toFixed(3) + ' s', CW - MR - 6, MT + 16);
+  cx.fillText('frame ' + fi + '/' + FR, CW - MR - 6, MT + 30);
+  cx.restore();
+
+  /* ── Scan-line overlay ── */
+  cx.save();
+  cx.globalAlpha = 0.025;
+  for (let y = 0; y < CH; y += 3) {
+    cx.fillStyle = '#000';
+    cx.fillRect(0, y, CW, 1);
+  }
   cx.restore();
 }
 
-/* ═══════════════════════════════════════════
-   ACTUALIZAR PANEL DE CÁLCULOS Y MÉTRICAS
-═══════════════════════════════════════════ */
+/* Seeded stars so they don't flicker */
+let _stars = null;
+function getStars() {
+  if (_stars) return _stars;
+  _stars = [];
+  for (let i = 0; i < 60; i++) {
+    const rng = Math.sin(i * 7.3 + 2.4) * 43758.5453;
+    const rx  = rng - Math.floor(rng);
+    const rng2 = Math.sin(i * 5.1 + 1.2) * 43758.5453;
+    const ry   = rng2 - Math.floor(rng2);
+    const rng3 = Math.sin(i * 3.7 + 0.9) * 43758.5453;
+    const rr   = rng3 - Math.floor(rng3);
+    _stars.push({
+      x: ML + rx * (CW - ML - MR),
+      y: MT + ry * (CH - MT - MB) * 0.7,
+      r: 0.3 + rr * 0.7,
+      a: 0.1 + rr * 0.4,
+    });
+  }
+  return _stars;
+}
+
+/* ════════════════════════════════════════════
+   UI UPDATE
+════════════════════════════════════════════ */
 function f2(n) { return isNaN(n) ? '—' : n.toFixed(2); }
 function f3(n) { return isNaN(n) ? '—' : n.toFixed(3); }
-function hl(valor, color) { return `<span style="color:${color};font-weight:600">${valor}</span>`; }
+function hl(v, col) { return `<span style="color:${col};font-weight:600">${v}</span>`; }
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function showEvent(msg, color = '#00FF9D') {
+  const el = document.getElementById('evFlash');
+  el.textContent = msg;
+  el.style.borderColor = color;
+  el.style.color = color;
+  el.style.background = hexToRgba(color, 0.12);
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 1800);
+}
 
 function updateUI() {
   const fi = Math.min(FR, Math.floor(frame));
@@ -666,173 +1130,160 @@ function updateUI() {
 
   document.getElementById('tsl').value = fi;
   document.getElementById('finfo').textContent =
-    `Cuadro ${fi}/${FR}  |  T = ${T.toFixed(2)}s  |  R = ${R.toFixed(1)}m  |  H = ${Hmax.toFixed(1)}m`;
+    `frame ${fi}/${FR}  ·  T=${T.toFixed(2)}s  ·  R=${R.toFixed(1)}m  ·  H=${Hmax.toFixed(1)}m`;
 
   const cards = [
-    { l: 't (s)',   v: t.toFixed(3)    },
-    { l: 'x (m)',  v: x.toFixed(2)    },
-    { l: 'y (m)',  v: y.toFixed(2)    },
-    { l: '|r| (m)', v: rMag.toFixed(2) },
-    { l: 'vₓ (m/s)', v: vx.toFixed(2)   },
-    { l: 'vᵧ (m/s)', v: vy.toFixed(2)   },
-    { l: '|v| (m/s)',v: vMag.toFixed(2) },
-    { l: '|a| (m/s²)',v: g.toFixed(2)   },
+    { l: 't (s)',     v: t.toFixed(3),    col: '' },
+    { l: 'x (m)',    v: x.toFixed(2),     col: '' },
+    { l: 'y (m)',    v: y.toFixed(2),     col: '' },
+    { l: '|r| (m)',  v: rMag.toFixed(2),  col: 'var(--pos)' },
+    { l: 'vₓ (m/s)', v: vx.toFixed(2),   col: '' },
+    { l: 'vᵧ (m/s)', v: vy.toFixed(2),   col: '' },
+    { l: '|v| (m/s)',v: vMag.toFixed(2),  col: 'var(--vel)' },
+    { l: '|a| (m/s²)',v: g.toFixed(2),    col: 'var(--acc)' },
   ];
-  document.getElementById('mc').innerHTML = cards
-    .map(c => `<div class="mcard"><div class="ml">${c.l}</div><div class="mv">${c.v}</div></div>`)
-    .join('');
+
+  document.getElementById('mc').innerHTML = cards.map(c => `
+    <div class="mcard ${c.col ? 'highlight' : ''}">
+      <div class="ml">${c.l}</div>
+      <div class="mv" style="${c.col ? 'color:'+c.col : ''}">${c.v}</div>
+    </div>`).join('');
 
   const hG   = 0.5 * g * t * t;
   const v0yt = v0y * t;
   document.getElementById('ptb').innerHTML =
 `x(t) = v₀ₓ · t
      = ${f2(v0x)} · ${f3(t)}
-     = ${hl(f2(x), '#0F6E56')} m
+     = ${hl(f2(x)+'m', 'var(--pos)')}
 
 y(t) = v₀ᵧ·t − ½g·t²
      = ${f2(v0y)}·${f3(t)} − ½·${g}·${f3(t)}²
      = ${f2(v0yt)} − ${f2(hG)}
-     = ${hl(f2(y), '#0F6E56')} m
+     = ${hl(f2(y)+'m', 'var(--pos)')}
 
-|r| = √(x² + y²)
-    = ${hl(f2(rMag), '#0F6E56')} m
+|r| = √(x²+y²)
+    = ${hl(f2(rMag)+'m', 'var(--pos)')}
 
 θᵣ = arctan(y/x)
-   = ${hl(f2(rAng) + '°', '#0F6E56')}`;
+   = ${hl(f2(rAng)+'°', 'var(--pos)')}`;
 
   const gT = g * t;
   document.getElementById('vtb').innerHTML =
 `vₓ(t) = v₀ₓ (cte.)
-      = ${hl(f2(vx), '#185FA5')} m/s
+      = ${hl(f2(vx)+' m/s', 'var(--vel)')}
 
 vᵧ(t) = v₀ᵧ − g·t
       = ${f2(v0y)} − ${f2(g)}·${f3(t)}
       = ${f2(v0y)} − ${f2(gT)}
-      = ${hl(f2(vy), '#185FA5')} m/s
+      = ${hl(f2(vy)+' m/s', 'var(--vel)')}
 
-|v| = √(vₓ² + vᵧ²)
-    = ${hl(f2(vMag), '#185FA5')} m/s
+|v| = √(vₓ²+vᵧ²)
+    = ${hl(f2(vMag)+' m/s', 'var(--vel)')}
 
 θᵥ = arctan(vᵧ/vₓ)
-   = ${hl(f2(vAng) + '°', '#185FA5')}`;
+   = ${hl(f2(vAng)+'°', 'var(--vel)')}`;
 
   document.getElementById('atb').innerHTML =
 `aₓ = 0 m/s²
 
-aᵧ = −g = ${hl('−' + f2(g), '#993C1D')} m/s²
+aᵧ = −g = ${hl('−'+f2(g)+' m/s²', 'var(--acc)')}
 
-|a| = g = ${hl(f2(g), '#993C1D')} m/s²
+|a| = g = ${hl(f2(g)+' m/s²', 'var(--acc)')}
 
 Descomposición inicial:
 v₀ₓ = ${v0}·cos(${angle}°)
-    = ${hl(f2(v0x), '#993C1D')} m/s
+    = ${hl(f2(v0x)+' m/s', 'var(--acc)')}
 
 v₀ᵧ = ${v0}·sin(${angle}°)
-    = ${hl(f2(v0y), '#993C1D')} m/s
+    = ${hl(f2(v0y)+' m/s', 'var(--acc)')}
 
-T = 2v₀ᵧ/g = ${hl(f2(T), '#993C1D')} s
-R = v₀²sin(2θ)/g
-  = ${hl(f2(R), '#993C1D')} m
-H = v₀ᵧ²/(2g)
-  = ${hl(f2(Hmax), '#993C1D')} m`;
+T = 2v₀ᵧ/g = ${hl(f2(T)+' s', 'var(--acc)')}
+R = v₀²sin(2θ)/g = ${hl(f2(R)+' m', 'var(--acc)')}
+H = v₀ᵧ²/(2g) = ${hl(f2(Hmax)+' m', 'var(--acc)')}`;
 }
 
-/* ═══════════════════════════════════════════
-   LOOP DE ANIMACIÓN
-═══════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   ANIMATION LOOP
+════════════════════════════════════════════ */
 function animate(ts) {
   if (!playing) return;
   if (!lastTs) lastTs = ts;
-
   const dt  = (ts - lastTs) / 1000;
   lastTs    = ts;
   const spd = parseFloat(document.getElementById('spd').value);
 
   frame = Math.min(FR, frame + dt * spd * FR / meta.T);
 
-  /* 🔴 DETECCIÓN DEL PUNTO MÁS ALTO */
   const fi = Math.min(FR, Math.floor(frame));
   const pt = traj[fi];
 
+  /* Auto-pause at apex */
   if (!pausedAtPeak && fi > 0 && traj[fi - 1].vy > 0 && pt.vy <= 0) {
     pausedAtPeak = true;
     playing = false;
-    document.getElementById('btnP').textContent = '▶ Play';
+    document.getElementById('btnP').textContent = '▶ PLAY';
+    showEvent('⬆ ÁPICE ALCANZADO — H = ' + meta.Hmax.toFixed(1) + ' m', '#FFB340');
   }
 
   if (frame >= FR) {
     frame   = FR;
     playing = false;
-    document.getElementById('btnP').textContent = '▶ Play';
+    document.getElementById('btnP').textContent = '▶ PLAY';
+    showEvent('🏁 ATERRIZAJE — R = ' + meta.R.toFixed(1) + ' m', '#FF5C5C');
   }
 
-  draw();
-  updateUI();
+  draw(); updateUI();
   if (playing) rafId = requestAnimationFrame(animate);
 }
 
-/* ═══════════════════════════════════════════
-   CONTROLES
-═══════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   CONTROLS
+════════════════════════════════════════════ */
 function togglePlay() {
   playing = !playing;
   if (playing) {
     if (frame >= FR) frame = 0;
-    document.getElementById('btnP').textContent = '⏸ Pausa';
+    document.getElementById('btnP').textContent = '⏸ PAUSA';
     lastTs = null;
     rafId  = requestAnimationFrame(animate);
+    if (frame < 2) showEvent('🚀 LANZAMIENTO — v₀ = ' + P.v0 + ' m/s', '#00FF9D');
   } else {
-    document.getElementById('btnP').textContent = '▶ Play';
+    document.getElementById('btnP').textContent = '▶ PLAY';
     if (rafId) cancelAnimationFrame(rafId);
   }
 }
 
 function step(d) {
-  if (playing) {
-    playing = false;
-    document.getElementById('btnP').textContent = '▶ Play';
-    if (rafId) cancelAnimationFrame(rafId);
-  }
+  if (playing) { playing = false; document.getElementById('btnP').textContent = '▶ PLAY'; if (rafId) cancelAnimationFrame(rafId); }
   frame = Math.max(0, Math.min(FR, Math.round(frame) + d));
   draw(); updateUI();
 }
 
 function seekTo(f) {
-  if (playing) {
-    playing = false;
-    document.getElementById('btnP').textContent = '▶ Play';
-    if (rafId) cancelAnimationFrame(rafId);
-  }
-  frame = f;
-  draw(); updateUI();
+  if (playing) { playing = false; document.getElementById('btnP').textContent = '▶ PLAY'; if (rafId) cancelAnimationFrame(rafId); }
+  frame = f; draw(); updateUI();
 }
 
 function resetS() {
-  if (playing) {
-    playing = false;
-    document.getElementById('btnP').textContent = '▶ Play';
-    if (rafId) cancelAnimationFrame(rafId);
-  }
-  frame = 0;
-  pausedAtPeak = false; /* 🔴 RESET */
+  if (playing) { playing = false; document.getElementById('btnP').textContent = '▶ PLAY'; if (rafId) cancelAnimationFrame(rafId); }
+  frame = 0; pausedAtPeak = false;
   draw(); updateUI();
 }
 
 function applyP() {
   P = {
-    v0:    Math.max(1,   Math.min(500, parseFloat(document.getElementById('pv0').value) || 49)),
-    angle: Math.max(1,   Math.min(89,  parseFloat(document.getElementById('pa').value)  || 45)),
-    g:     Math.max(0.1, Math.min(30,  parseFloat(document.getElementById('pg').value)  || 9.8)),
+    v0:    Math.max(1,   Math.min(200, parseFloat(document.getElementById('rv0').value) || 49)),
+    angle: Math.max(1,   Math.min(89,  parseFloat(document.getElementById('ra').value)  || 45)),
+    g:     Math.max(0.1, Math.min(25,  parseFloat(document.getElementById('rg').value)  || 9.8)),
   };
   compute();
-  pausedAtPeak = false; /* 🔴 RESET */
+  pausedAtPeak = false;
   resetS();
+  showEvent('✓ PARÁMETROS ACTUALIZADOS', '#00FF9D');
 }
 
-/* ═══════════════════════════════════════════
-   INICIO
-═══════════════════════════════════════════ */
-compute();
-draw();
-updateUI();
+/* ── init ── */
+compute(); draw(); updateUI();
 </script>
+</body>
+</html>
